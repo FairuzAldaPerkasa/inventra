@@ -15,6 +15,8 @@ import (
 	"inventra/internal/database"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"inventra/internal/product"
 )
 
 func main() {
@@ -40,9 +42,15 @@ func run() error {
 
 	log.Println("Koneksi PostgreSQL berhasil")
 
+	productRepo := product.NewRepository(pool)
+	productHandler := product.NewHandler(productRepo)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler(cfg.AppName))
 	mux.HandleFunc("/ready", readyHandler(pool))
+
+	mux.HandleFunc("GET /api/products", productHandler.List)
+	mux.HandleFunc("GET /api/products/{id}", productHandler.GetByID)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
