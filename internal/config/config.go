@@ -9,14 +9,19 @@ import (
 )
 
 type Config struct {
-	AppName  string
-	HTTPAddr string
+	AppName    string
+	HTTPAddr   string
+	DBPassword string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		AppName:  getEnv("APP_NAME", "Inventra"),
-		HTTPAddr: getEnv("HTTP_ADDR", "127.0.0.1:8081"),
+		AppName:    getEnv("APP_NAME", "Inventra"),
+		HTTPAddr:   getEnv("HTTP_ADDR", "127.0.0.1:8081"),
+		DBPassword: os.Getenv("DB_PASSWORD"),
+	}
+	if cfg.DBPassword == "" {
+		return Config{}, fmt.Errorf("DB_PASSWORD wajib diisi")
 	}
 
 	host, port, err := net.SplitHostPort(cfg.HTTPAddr)

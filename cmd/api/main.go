@@ -1,22 +1,48 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
-	"inventra/internal/config"
+	"errors"
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"time"
+
+	"inventra/internal/config"
+	"inventra/internal/database"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Konfigurasi tidak valid: %v", err)
+		return err
 	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	pool, err := database.Open(ctx, cfg.DBPassword)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	log.Println("Koneksi PostgreSQL berhasil")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler(cfg.AppName))
+	mux.HandleFunc("/ready", readyHandler(pool))
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -29,34 +55,96 @@ func main() {
 
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
 	if err != nil {
-		log.Fatalf("Gagal membuka alamat server: %v", err)
+		return err
 	}
+
+	serverErr := make(chan error, 1)
+
+	go func() {
+		serverErr <- server.Serve(listener)
+	}()
 
 	log.Printf("%s berjalan di http://%s", cfg.AppName, listener.Addr())
 
-	if err := server.Serve(listener); err != nil &&
-		err != http.ErrServerClosed {
-		log.Fatalf("Server berhenti karena error: %v", err)
+	select {
+	case err := <-serverErr:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+
+	case <-ctx.Done():
+		log.Println("Menghentikan server...")
+
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(), 5*time.Second,
+		)
+		defer cancel()
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			_ = server.Close()
+			return err
+		}
+
+		return nil
 	}
 }
 
 func healthHandler(appName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			w.Header().Set("Allow", http.MethodGet)
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !allowGET(w, r) {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-
-		response := map[string]string{
+		writeJSON(w, http.StatusOK, map[string]string{
 			"status":  "ok",
 			"service": appName,
+		})
+	}
+}
+
+func readyHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !allowGET(w, r) {
+			return
 		}
 
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Gagal menulis respons health: %v", err)
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		if err := pool.Ping(ctx); err != nil {
+			log.Printf("Pemeriksaan database gagal: %v", err)
+
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"status":   "not_ready",
+				"database": "unavailable",
+			})
+			return
 		}
+
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status":   "ready",
+			"database": "ok",
+		})
+	}
+}
+
+func allowGET(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return false
+	}
+
+	return true
+}
+
+func writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("Gagal menulis respons JSON: %v", err)
 	}
 }
