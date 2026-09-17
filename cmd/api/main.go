@@ -16,7 +16,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"inventra/internal/messaging"
 	"inventra/internal/product"
 )
 
@@ -42,18 +41,6 @@ func run() error {
 	defer pool.Close()
 
 	log.Println("Koneksi PostgreSQL berhasil")
-
-	rabbit, err := messaging.Open(
-		cfg.RabbitMQUser,
-		cfg.RabbitMQPassword,
-		cfg.RabbitMQVHost,
-	)
-	if err != nil {
-		return err
-	}
-	defer rabbit.Close()
-
-	log.Println("Koneksi RabbitMQ berhasil; exchange dan queue siap")
 
 	productRepo := product.NewRepository(pool)
 	productHandler := product.NewHandler(productRepo)
