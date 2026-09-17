@@ -9,19 +9,28 @@ import (
 )
 
 type Config struct {
-	AppName    string
-	HTTPAddr   string
-	DBPassword string
+	AppName          string
+	HTTPAddr         string
+	DBPassword       string
+	RabbitMQUser     string
+	RabbitMQPassword string
+	RabbitMQVHost    string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		AppName:    getEnv("APP_NAME", "Inventra"),
-		HTTPAddr:   getEnv("HTTP_ADDR", "127.0.0.1:8081"),
-		DBPassword: os.Getenv("DB_PASSWORD"),
+		AppName:          getEnv("APP_NAME", "Inventra"),
+		HTTPAddr:         getEnv("HTTP_ADDR", "127.0.0.1:8081"),
+		DBPassword:       os.Getenv("DB_PASSWORD"),
+		RabbitMQUser:     getEnv("RABBITMQ_USER", "inventra_app"),
+		RabbitMQPassword: os.Getenv("RABBITMQ_PASSWORD"),
+		RabbitMQVHost:    getEnv("RABBITMQ_VHOST", "inventra"),
 	}
 	if cfg.DBPassword == "" {
 		return Config{}, fmt.Errorf("DB_PASSWORD wajib diisi")
+	}
+	if cfg.RabbitMQPassword == "" {
+		return Config{}, fmt.Errorf("RABBITMQ_PASSWORD wajib diisi")
 	}
 
 	host, port, err := net.SplitHostPort(cfg.HTTPAddr)
