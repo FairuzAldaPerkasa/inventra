@@ -69,7 +69,8 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
-	p, err := h.repo.GetByID(ctx, id)
+	p, cacheStatus, err := h.repo.GetByIDCached(ctx, id)
+	w.Header().Set("X-Cache", cacheStatus)
 	if errors.Is(err, ErrNotFound) {
 		writeJSON(w, http.StatusNotFound, map[string]string{
 			"error": "produk tidak ditemukan",

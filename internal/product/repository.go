@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -11,7 +12,8 @@ import (
 var ErrNotFound = errors.New("produk tidak ditemukan")
 
 type Repository struct {
-	pool *pgxpool.Pool
+	pool        *pgxpool.Pool
+	detailCache *ProductCache
 }
 
 func NewRepository(pool *pgxpool.Pool) *Repository {

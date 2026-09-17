@@ -2,26 +2,31 @@ package cache
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
+func NewRedisFromEnv() (*redis.Client, error) {
+	rawURL := os.Getenv("REDIS_URL")
+	if rawURL == "" {
+		rawURL = "redis://127.0.0.1:6379/0"
+	}
+	return NewRedis(rawURL)
+}
+
 func NewRedis(rawURL string) (*redis.Client, error) {
 	options, err := redis.ParseURL(rawURL)
 	if err != nil {
-		// Jangan tampilkan URL karena bisa mengandung password.
 		return nil, fmt.Errorf("konfigurasi REDIS_URL tidak valid")
 	}
-
-	options.DialTimeout = 2 * time.Second
-	options.ReadTimeout = 1 * time.Second
-	options.WriteTimeout = 1 * time.Second
-	options.PoolTimeout = 1 * time.Second
+	options.Protocol = 2
+	options.DialTimeout = 250 * time.Millisecond
+	options.ReadTimeout = 250 * time.Millisecond
+	options.WriteTimeout = 250 * time.Millisecond
+	options.PoolTimeout = 250 * time.Millisecond
 	options.ContextTimeoutEnabled = true
-
-	// Batasi waktu tunggu ketika Redis tidak tersedia.
 	options.MaxRetries = -1
-
 	return redis.NewClient(options), nil
 }

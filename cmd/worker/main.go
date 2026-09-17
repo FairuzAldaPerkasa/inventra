@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"time"
 
+	"inventra/internal/cache"
 	"inventra/internal/config"
 	"inventra/internal/database"
 	"inventra/internal/messaging"
@@ -50,7 +51,14 @@ func run() error {
 	}
 	defer rabbit.Close()
 
-	repo := product.NewRepository(pool)
+	redisClient, err := cache.NewRedisFromEnv()
+	if err != nil {
+		return err
+	}
+	defer redisClient.Close()
+
+	// Redis diperiksa saat digunakan; gangguannya tidak memblokir startup.
+	repo := product.NewCachedRepository(pool, redisClient)
 
 	if err := rabbit.Channel.Qos(1, 0, false); err != nil {
 		return fmt.Errorf("mengatur prefetch worker: %w", err)
@@ -69,7 +77,7 @@ func run() error {
 		return fmt.Errorf("memulai consumer produk: %w", err)
 	}
 
-	log.Println("Worker produk berjalan. Tekan Ctrl+C untuk berhenti.")
+	log.Println("Worker CRUD produk berjalan. Tekan Ctrl+C untuk berhenti.")
 
 	for {
 		select {
@@ -91,18 +99,46 @@ func run() error {
 				)
 			}
 
-			if delivery.RoutingKey != messaging.CreateProductKey ||
-				delivery.Type != messaging.CreateProductKey {
+			if delivery.Type != delivery.RoutingKey {
 				return fmt.Errorf(
-					"jenis pesan belum didukung; worker dihentikan tanpa ACK",
+					"type dan routing key tidak sesuai; pesan belum di-ACK",
 				)
 			}
 
 			workCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			outcome, err := repo.ProcessCreate(workCtx, delivery.MessageId)
+
+			var outcome string
+			var processErr error
+
+			switch delivery.RoutingKey {
+			case messaging.CreateProductKey:
+				outcome, processErr = repo.ProcessCreate(
+					workCtx,
+					delivery.MessageId,
+				)
+
+			case messaging.UpdateProductKey:
+				outcome, processErr = repo.ProcessUpdate(
+					workCtx,
+					delivery.MessageId,
+				)
+
+			case messaging.DeleteProductKey:
+				outcome, processErr = repo.ProcessDelete(
+					workCtx,
+					delivery.MessageId,
+				)
+
+			default:
+				processErr = fmt.Errorf(
+					"routing key belum didukung: %s",
+					delivery.RoutingKey,
+				)
+			}
+
 			cancel()
 
-			if err != nil {
+			if processErr != nil {
 				if ctx.Err() != nil {
 					return nil
 				}
@@ -110,8 +146,20 @@ func run() error {
 				return fmt.Errorf(
 					"operasi %s belum di-ACK: %w",
 					delivery.MessageId,
-					err,
+					processErr,
 				)
+			}
+
+			// Process* sudah commit, termasuk pada pesan yang pernah diproses.
+			// Cache bersifat best-effort; transaksi DB tidak diulang jika Redis gagal.
+			if delivery.RoutingKey == messaging.UpdateProductKey ||
+				delivery.RoutingKey == messaging.DeleteProductKey {
+				cacheCtx, cacheCancel := context.WithTimeout(ctx, 2*time.Second)
+				cacheErr := repo.InvalidateOperationCache(cacheCtx, delivery.MessageId)
+				cacheCancel()
+				if cacheErr != nil {
+					log.Printf("operation_id=%s invalidasi cache gagal: %v; TTL membatasi data lama", delivery.MessageId, cacheErr)
+				}
 			}
 
 			if err := delivery.Ack(false); err != nil {
@@ -119,8 +167,9 @@ func run() error {
 			}
 
 			log.Printf(
-				"operation_id=%s outcome=%s redelivered=%t ACK dikirim",
+				"operation_id=%s action=%s outcome=%s redelivered=%t ACK dikirim",
 				delivery.MessageId,
+				delivery.RoutingKey,
 				outcome,
 				delivery.Redelivered,
 			)

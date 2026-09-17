@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"time"
 
+	"inventra/internal/cache"
 	"inventra/internal/config"
 	"inventra/internal/database"
 
@@ -43,7 +44,14 @@ func run() error {
 
 	log.Println("Koneksi PostgreSQL berhasil")
 
-	productRepo := product.NewRepository(pool)
+	redisClient, err := cache.NewRedisFromEnv()
+	if err != nil {
+		return err
+	}
+	defer redisClient.Close()
+
+	// Redis diperiksa saat digunakan; gangguannya tidak memblokir startup.
+	productRepo := product.NewCachedRepository(pool, redisClient)
 	productHandler := product.NewHandler(productRepo)
 	operationRepo := operation.NewRepository(pool)
 	operationHandler := operation.NewHandler(operationRepo)
@@ -56,6 +64,7 @@ func run() error {
 	mux.HandleFunc("GET /api/products/{id}", productHandler.GetByID)
 	mux.HandleFunc("GET /api/operations/{id}", operationHandler.GetByID)
 	mux.HandleFunc("PUT /api/products/{id}", productHandler.Update)
+	mux.HandleFunc("DELETE /api/products/{id}", productHandler.Delete)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           mux,
