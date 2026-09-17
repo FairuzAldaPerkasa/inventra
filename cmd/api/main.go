@@ -19,6 +19,11 @@ import (
 
 	"inventra/internal/operation"
 	"inventra/internal/product"
+	"inventra/internal/session"
+	"inventra/internal/user"
+	"io/fs"
+
+	"inventra/internal/webui"
 )
 
 func main() {
@@ -55,6 +60,15 @@ func run() error {
 	productHandler := product.NewHandler(productRepo)
 	operationRepo := operation.NewRepository(pool)
 	operationHandler := operation.NewHandler(operationRepo)
+	userRepo := user.NewRepository(pool)
+	sessionRepo := session.NewRepository(pool)
+	sessionHandler := session.NewHandler(
+		userRepo,
+		sessionRepo,
+		cfg.SessionTTL,
+		cfg.CookieSecure,
+		cfg.CookieDomain,
+	)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler(cfg.AppName))
@@ -65,6 +79,14 @@ func run() error {
 	mux.HandleFunc("GET /api/operations/{id}", operationHandler.GetByID)
 	mux.HandleFunc("PUT /api/products/{id}", productHandler.Update)
 	mux.HandleFunc("DELETE /api/products/{id}", productHandler.Delete)
+	mux.HandleFunc("POST /api/auth/login", sessionHandler.Login)
+	mux.HandleFunc("POST /api/auth/logout", sessionHandler.Logout)
+	mux.HandleFunc("GET /api/auth/me", sessionHandler.Me)
+	staticFiles, err := fs.Sub(webui.Files, "static")
+	if err != nil {
+		return err
+	}
+	mux.Handle("/", http.FileServerFS(staticFiles))
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           mux,

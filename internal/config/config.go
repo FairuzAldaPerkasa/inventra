@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -15,6 +16,9 @@ type Config struct {
 	RabbitMQUser     string
 	RabbitMQPassword string
 	RabbitMQVHost    string
+	SessionTTL       time.Duration
+	CookieSecure     bool
+	CookieDomain     string
 }
 
 func Load() (Config, error) {
@@ -25,6 +29,7 @@ func Load() (Config, error) {
 		RabbitMQUser:     getEnv("RABBITMQ_USER", "inventra_app"),
 		RabbitMQPassword: os.Getenv("RABBITMQ_PASSWORD"),
 		RabbitMQVHost:    getEnv("RABBITMQ_VHOST", "inventra"),
+		CookieDomain:     getEnv("COOKIE_DOMAIN", ""),
 	}
 	if cfg.DBPassword == "" {
 		return Config{}, fmt.Errorf("DB_PASSWORD wajib diisi")
@@ -39,7 +44,6 @@ func Load() (Config, error) {
 			"HTTP_ADDR harus berformat host:port: %w", err,
 		)
 	}
-
 	if host == "" {
 		return Config{}, fmt.Errorf("host pada HTTP_ADDR tidak boleh kosong")
 	}
@@ -50,6 +54,20 @@ func Load() (Config, error) {
 			"port pada HTTP_ADDR harus berupa angka 1–65535",
 		)
 	}
+
+	sessionTTLHours, err := strconv.Atoi(getEnv("SESSION_TTL_HOURS", "24"))
+	if err != nil || sessionTTLHours < 1 {
+		return Config{}, fmt.Errorf(
+			"SESSION_TTL_HOURS harus berupa angka positif",
+		)
+	}
+	cfg.SessionTTL = time.Duration(sessionTTLHours) * time.Hour
+
+	cookieSecure, err := strconv.ParseBool(getEnv("COOKIE_SECURE", "true"))
+	if err != nil {
+		return Config{}, fmt.Errorf("COOKIE_SECURE harus true/false")
+	}
+	cfg.CookieSecure = cookieSecure
 
 	return cfg, nil
 }

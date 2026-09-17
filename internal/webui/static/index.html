@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventra</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ===== Login ===== -->
+    <section id="view-login" class="view">
+      <div class="card card-narrow">
+        <h1>Inventra</h1>
+        <p class="subtitle">Masuk untuk mengelola inventaris</p>
+        <form id="login-form">
+          <label>
+            Email
+            <input type="email" id="login-email" required autocomplete="username" />
+          </label>
+          <label>
+            Password
+            <input type="password" id="login-password" required autocomplete="current-password" />
+          </label>
+          <button type="submit">Masuk</button>
+          <p id="login-error" class="error hidden"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== App (setelah login) ===== -->
+    <section id="view-app" class="view hidden">
+      <header class="topbar">
+        <div class="brand">Inventra</div>
+        <nav>
+          <button class="tab active" data-tab="products">Produk</button>
+          <button class="tab" data-tab="status">Status Pemrosesan</button>
+        </nav>
+        <div class="user-box">
+          <span id="current-user-name"></span>
+          <span id="current-user-role" class="badge"></span>
+          <button id="logout-btn" class="btn-secondary">Keluar</button>
+        </div>
+      </header>
+
+      <main>
+        <!-- Tab: Produk -->
+        <div id="tab-products" class="tab-panel">
+          <div class="panel-header">
+            <h2>Daftar Produk</h2>
+            <button id="new-product-btn">+ Produk Baru</button>
+          </div>
+
+          <div id="product-table-wrap">
+            <table id="product-table">
+              <thead><tr id="product-table-head"></tr></thead>
+              <tbody id="product-table-body"></tbody>
+            </table>
+            <p id="product-empty" class="hidden muted">Belum ada produk.</p>
+          </div>
+
+          <!-- Form create/update -->
+          <div id="product-form-backdrop" class="backdrop hidden">
+            <div class="card">
+              <h3 id="product-form-title">Produk Baru</h3>
+              <form id="product-form">
+                <input type="hidden" id="product-id" />
+                <input type="hidden" id="product-version" />
+                <label>
+                  SKU
+                  <input type="text" id="product-sku" required maxlength="50"
+                         placeholder="Huruf besar, angka, - atau _" />
+                </label>
+                <label>
+                  Nama
+                  <input type="text" id="product-name" required maxlength="150" />
+                </label>
+                <label>
+                  Kategori
+                  <input type="text" id="product-category" required maxlength="100" />
+                </label>
+                <label>
+                  Brand
+                  <input type="text" id="product-brand" required maxlength="100" />
+                </label>
+                <label>
+                  Harga
+                  <input type="text" id="product-price" required
+                         placeholder="contoh: 150000.00"
+                         pattern="^(0|[1-9][0-9]{0,12})(\.[0-9]{1,2})?$" />
+                </label>
+                <div class="form-actions">
+                  <button type="button" id="product-form-cancel" class="btn-secondary">Batal</button>
+                  <button type="submit">Simpan</button>
+                </div>
+                <p id="product-form-error" class="error hidden"></p>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Status pemrosesan -->
+        <div id="tab-status" class="tab-panel hidden">
+          <h2>Status Pemrosesan</h2>
+          <p class="muted">Setiap perubahan produk diproses secara asinkron melalui antrean. Status terbaru muncul di sini.</p>
+          <ul id="operation-list"></ul>
+        </div>
+      </main>
+    </section>
+
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
