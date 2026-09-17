@@ -16,6 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"inventra/internal/operation"
 	"inventra/internal/product"
 )
 
@@ -44,6 +45,8 @@ func run() error {
 
 	productRepo := product.NewRepository(pool)
 	productHandler := product.NewHandler(productRepo)
+	operationRepo := operation.NewRepository(pool)
+	operationHandler := operation.NewHandler(operationRepo)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler(cfg.AppName))
@@ -51,7 +54,7 @@ func run() error {
 	mux.HandleFunc("POST /api/products", productHandler.Create)
 	mux.HandleFunc("GET /api/products", productHandler.List)
 	mux.HandleFunc("GET /api/products/{id}", productHandler.GetByID)
-
+	mux.HandleFunc("GET /api/operations/{id}", operationHandler.GetByID)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           mux,

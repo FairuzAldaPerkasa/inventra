@@ -58,9 +58,14 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Alamat untuk memeriksa hasil pemrosesan operasi.
+	statusURL := "/api/operations/" + operationID
+	w.Header().Set("Location", statusURL)
+
 	writeJSON(w, http.StatusAccepted, map[string]string{
 		"operation_id": operationID,
 		"status":       "pending",
+		"status_url":   statusURL,
 		"message":      "permintaan pembuatan produk diterima",
 	})
 }
