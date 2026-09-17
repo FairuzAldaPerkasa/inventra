@@ -61,7 +61,7 @@ func run() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler(cfg.AppName))
 	mux.HandleFunc("/ready", readyHandler(pool))
-
+	mux.HandleFunc("POST /api/products", productHandler.Create)
 	mux.HandleFunc("GET /api/products", productHandler.List)
 	mux.HandleFunc("GET /api/products/{id}", productHandler.GetByID)
 
