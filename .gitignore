@@ -12,3 +12,9 @@ coverage.out
 
 # Log
 *.log
+
+# Konfigurasi pribadi Postman
+/postman/globals/
+/postman/environments/*
+!/postman/environments/*.example.yaml
+!/postman/environments/*.example.json
