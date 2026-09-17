@@ -55,6 +55,7 @@ func run() error {
 	mux.HandleFunc("GET /api/products", productHandler.List)
 	mux.HandleFunc("GET /api/products/{id}", productHandler.GetByID)
 	mux.HandleFunc("GET /api/operations/{id}", operationHandler.GetByID)
+	mux.HandleFunc("PUT /api/products/{id}", productHandler.Update)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           mux,
