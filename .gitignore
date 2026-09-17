@@ -1,0 +1,14 @@
+# Konfigurasi lokal dan secret
+.env
+.env.*
+!.env.example
+
+# Hasil build dan pengujian
+/bin/
+/dist/
+*.exe
+*.test
+coverage.out
+
+# Log
+*.log

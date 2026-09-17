@@ -1,3 +1,3 @@
-module Inventra
+module inventra
 
 go 1.27.1
